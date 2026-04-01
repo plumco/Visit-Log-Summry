@@ -1,171 +1,346 @@
-import streamlit as st
-import pandas as pd
-import plotly.graph_objects as go
-import plotly.express as px
+import React, { useState, useMemo } from 'react';
+import { 
+  BarChart, 
+  Bar, 
+  XAxis, 
+  YAxis, 
+  CartesianGrid, 
+  Tooltip, 
+  ResponsiveContainer, 
+  Cell 
+} from 'recharts';
+import { 
+  LayoutDashboard, 
+  Building2, 
+  MapPin, 
+  FileText, 
+  Clock, 
+  TrendingUp, 
+  TrendingDown,
+  Users,
+  Search,
+  Download,
+  Calendar,
+  Filter
+} from 'lucide-react';
 
-# Set page configuration
-st.set_page_config(
-    page_title="Executive Performance Dashboard",
-    page_icon="📊",
-    layout="wide",
-    initial_sidebar_state="expanded"
-)
+const DATA_SET = {
+  jan: [
+    { id: 'Yash', floor: 87, site: 71, reportMark: 63, suggestion: 24, pending: 3, sent: 60, backlog: 0, total: 60 },
+    { id: 'prath', floor: 97, site: 56, reportMark: 91, suggestion: 6, pending: 1, sent: 90, backlog: 0, total: 90 },
+    { id: 'Jiten', floor: 29, site: 17, reportMark: 5, suggestion: 12, pending: 5, sent: 0, backlog: 0, total: 0 },
+  ],
+  feb: [
+    { id: 'Yash', floor: 62, site: 57, reportMark: 36, suggestion: 22, pending: 4, sent: 35, backlog: 3, total: 38 },
+    { id: 'prath', floor: 73, site: 59, reportMark: 51, suggestion: 8, pending: 9, sent: 58, backlog: 1, total: 59 },
+    { id: 'Jiten', floor: 43, site: 31, reportMark: 2, suggestion: 29, pending: 0, sent: 2, backlog: 5, total: 7 },
+    { id: 'Rutic', floor: 36, site: 36, reportMark: 14, suggestion: 22, pending: 1, sent: 13, backlog: 0, total: 13 },
+    { id: 'Harsh', floor: 51, site: 35, reportMark: 15, suggestion: 20, pending: 0, sent: 26, backlog: 0, total: 26 },
+  ],
+  mar: [
+    { id: 'Yash', floor: 43, site: 41, reportMark: 30, suggestion: 13, pending: 0, sent: 29, backlog: 4, total: 34 },
+    { id: 'prath', floor: 53, site: 39, reportMark: 46, suggestion: 7, pending: 0, sent: 32, backlog: 9, total: 55 },
+    { id: 'Jiten', floor: 31, site: 23, reportMark: 3, suggestion: 28, pending: 0, sent: 3, backlog: 0, total: 3 },
+    { id: 'Rutic', floor: 23, site: 18, reportMark: 4, suggestion: 19, pending: 0, sent: 3, backlog: 1, total: 5 },
+    { id: 'Harsh', floor: 55, site: 46, reportMark: 35, suggestion: 20, pending: 0, sent: 35, backlog: 0, total: 35 },
+  ]
+};
 
-# Custom CSS for modern styling
-st.markdown("""
-    <style>
-    .main {
-        background-color: #F8FAFC;
+const StatCard = ({ title, value, icon: Icon, gradient, delta, isIncrease }) => (
+  <div className="bg-white rounded-[2rem] p-6 shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-slate-50 relative overflow-hidden group transition-all hover:shadow-xl">
+    <div className="flex justify-between items-start mb-6">
+      <div className={`p-4 rounded-2xl bg-gradient-to-br ${gradient} shadow-lg shadow-opacity-20`}>
+        <Icon size={24} className="text-white" strokeWidth={2.5} />
+      </div>
+      <div className="text-right">
+        <p className="text-slate-400 text-[10px] font-black uppercase tracking-[0.2em] mb-1">{title}</p>
+        <h3 className="text-4xl font-black text-slate-800 tracking-tight">{value}</h3>
+      </div>
+    </div>
+    <div className="flex items-center gap-2">
+      {delta !== undefined ? (
+        <>
+          <span className="text-[10px] font-bold text-slate-300 uppercase">vs Last Month</span>
+          <div className={`flex items-center gap-0.5 px-2.5 py-1 rounded-xl text-[11px] font-black ${isIncrease ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}>
+            {isIncrease ? <TrendingUp size={12} strokeWidth={3} /> : <TrendingDown size={12} strokeWidth={3} />}
+            {delta}
+          </div>
+        </>
+      ) : (
+        <span className="text-[10px] font-bold text-slate-300 uppercase tracking-widest italic">Base Month</span>
+      )}
+    </div>
+  </div>
+);
+
+const App = () => {
+  const [activeTab, setActiveTab] = useState('mar');
+  const [filterText, setFilterText] = useState('');
+
+  const months = ['jan', 'feb', 'mar'];
+  const currentData = useMemo(() => {
+    return DATA_SET[activeTab].filter(item => 
+      item.id.toLowerCase().includes(filterText.toLowerCase())
+    );
+  }, [activeTab, filterText]);
+
+  const stats = useMemo(() => {
+    const getTotals = (data) => data.reduce((acc, curr) => ({
+      floor: acc.floor + curr.floor,
+      site: acc.site + curr.site,
+      reportMark: acc.reportMark + curr.reportMark,
+      suggestion: acc.suggestion + curr.suggestion,
+      pending: acc.pending + curr.pending,
+      sent: acc.sent + curr.sent,
+      backlog: acc.backlog + curr.backlog,
+      total: acc.total + curr.total
+    }), { floor: 0, site: 0, reportMark: 0, suggestion: 0, pending: 0, sent: 0, backlog: 0, total: 0 });
+
+    const currentTotals = getTotals(DATA_SET[activeTab]);
+    let deltas = null;
+
+    const prevMonthIdx = months.indexOf(activeTab) - 1;
+    if (prevMonthIdx >= 0) {
+      const prevTotals = getTotals(DATA_SET[months[prevMonthIdx]]);
+      deltas = {
+        floor: currentTotals.floor - prevTotals.floor,
+        site: currentTotals.site - prevTotals.site,
+        total: currentTotals.total - prevTotals.total,
+        pending: currentTotals.pending - prevTotals.pending
+      };
     }
-    .stMetric {
-        background-color: white;
-        padding: 20px;
-        border-radius: 15px;
-        box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);
-        border: 1px solid #F1F5F9;
-    }
-    div[data-testid="stMetricValue"] {
-        font-size: 2rem;
-        font-weight: 800;
-    }
-    .footer {
-        position: fixed;
-        left: 0;
-        bottom: 0;
-        width: 100%;
-        background-color: white;
-        color: #94a3b8;
-        text-align: center;
-        padding: 10px;
-        font-size: 10px;
-        font-weight: bold;
-        letter-spacing: 2px;
-        border-top: 1px solid #F1F5F9;
-    }
-    </style>
-    """, unsafe_allow_html=True)
 
-# Data Store based on provided images
-DATA = {
-    "January": [
-        {"Associate ID": "Yash", "Floor Visit": 87, "Site Visit": 71, "Report Mark (YES)": 63, "Suggestion (NO)": 24, "Pending": 3, "Sent": 60, "Backlog": 0, "Total": 60},
-        {"Associate ID": "Prath", "Floor Visit": 97, "Site Visit": 56, "Report Mark (YES)": 91, "Suggestion (NO)": 6, "Pending": 1, "Sent": 90, "Backlog": 0, "Total": 90},
-        {"Associate ID": "Jiten", "Floor Visit": 29, "Site Visit": 17, "Report Mark (YES)": 5, "Suggestion (NO)": 12, "Pending": 5, "Sent": 0, "Backlog": 0, "Total": 0},
-    ],
-    "February": [
-        {"Associate ID": "Yash", "Floor Visit": 62, "Site Visit": 57, "Report Mark (YES)": 36, "Suggestion (NO)": 22, "Pending": 4, "Sent": 35, "Backlog": 3, "Total": 38},
-        {"Associate ID": "Prath", "Floor Visit": 73, "Site Visit": 59, "Report Mark (YES)": 51, "Suggestion (NO)": 8, "Pending": 9, "Sent": 58, "Backlog": 1, "Total": 59},
-        {"Associate ID": "Jiten", "Floor Visit": 43, "Site Visit": 31, "Report Mark (YES)": 2, "Suggestion (NO)": 29, "Pending": 0, "Sent": 2, "Backlog": 5, "Total": 7},
-        {"Associate ID": "Rutic", "Floor Visit": 36, "Site Visit": 36, "Report Mark (YES)": 14, "Suggestion (NO)": 22, "Pending": 1, "Sent": 13, "Backlog": 0, "Total": 13},
-        {"Associate ID": "Harsh", "Floor Visit": 51, "Site Visit": 35, "Report Mark (YES)": 15, "Suggestion (NO)": 20, "Pending": 0, "Sent": 26, "Backlog": 0, "Total": 26},
-    ],
-    "March": [
-        {"Associate ID": "Yash", "Floor Visit": 43, "Site Visit": 41, "Report Mark (YES)": 30, "Suggestion (NO)": 13, "Pending": 0, "Sent": 29, "Backlog": 4, "Total": 33},
-        {"Associate ID": "Prath", "Floor Visit": 53, "Site Visit": 39, "Report Mark (YES)": 46, "Suggestion (NO)": 7, "Pending": 0, "Sent": 32, "Backlog": 9, "Total": 41},
-        {"Associate ID": "Jiten", "Floor Visit": 31, "Site Visit": 23, "Report Mark (YES)": 3, "Suggestion (NO)": 28, "Pending": 0, "Sent": 3, "Backlog": 0, "Total": 3},
-        {"Associate ID": "Rutic", "Floor Visit": 23, "Site Visit": 18, "Report Mark (YES)": 4, "Suggestion (NO)": 19, "Pending": 0, "Sent": 3, "Backlog": 1, "Total": 4},
-        {"Associate ID": "Harsh", "Floor Visit": 55, "Site Visit": 46, "Report Mark (YES)": 35, "Suggestion (NO)": 20, "Pending": 0, "Sent": 35, "Backlog": 0, "Total": 35},
-    ]
-}
+    return { totals: currentTotals, deltas };
+  }, [activeTab]);
 
-# Sidebar Navigation
-st.sidebar.title("Navigation")
-active_month = st.sidebar.selectbox("Select Month", options=list(DATA.keys()), index=2)
-st.sidebar.markdown("---")
-st.sidebar.info("This dashboard tracks associate field performance across multiple months.")
+  return (
+    <div className="min-h-screen bg-[#F8FAFC] p-4 md:p-12 font-sans text-slate-800">
+      <div className="max-w-[1400px] mx-auto space-y-10">
+        
+        {/* Header Section */}
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-8">
+          <div className="flex items-center gap-6">
+            <div className="bg-[#3B82F6] p-4 rounded-2xl shadow-xl shadow-blue-100">
+              <LayoutDashboard className="text-white" size={32} strokeWidth={2.5} />
+            </div>
+            <div>
+              <h1 className="text-4xl font-black tracking-tight text-slate-900 uppercase">Executive Dashboard</h1>
+              <p className="text-slate-400 font-bold mt-2 text-sm uppercase tracking-widest flex items-center gap-2">
+                <Calendar size={14} className="text-blue-500" />
+                Performance Suite • {activeTab.toUpperCase()} 2024
+              </p>
+            </div>
+          </div>
 
-# Prepare Dataframes
-df_current = pd.DataFrame(DATA[active_month])
+          <div className="flex bg-white p-1.5 rounded-[2rem] shadow-sm border border-slate-100">
+            {months.map(m => (
+              <button 
+                key={m}
+                onClick={() => setActiveTab(m)}
+                className={`px-10 py-3 rounded-[1.5rem] text-xs font-black uppercase tracking-[0.2em] transition-all duration-300 ${activeTab === m ? 'bg-slate-900 text-white shadow-lg' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-50'}`}
+              >
+                {m}
+              </button>
+            ))}
+          </div>
+        </div>
 
-# Calculate Totals
-totals = df_current.sum(numeric_only=True)
-prev_totals = None
-if active_month == "February":
-    prev_totals = pd.DataFrame(DATA["January"]).sum(numeric_only=True)
-elif active_month == "March":
-    prev_totals = pd.DataFrame(DATA["February"]).sum(numeric_only=True)
+        {/* KPI Grid */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
+          <StatCard 
+            title="Total Tower Visits" 
+            value={stats.totals.floor} 
+            icon={Building2} 
+            gradient="from-indigo-500 to-indigo-600"
+            delta={stats.deltas ? Math.abs(stats.deltas.floor) : undefined}
+            isIncrease={stats.deltas?.floor >= 0}
+          />
+          <StatCard 
+            title="Total Site Visits" 
+            value={stats.totals.site} 
+            icon={MapPin} 
+            gradient="from-emerald-500 to-emerald-600"
+            delta={stats.deltas ? Math.abs(stats.deltas.site) : undefined}
+            isIncrease={stats.deltas?.site >= 0}
+          />
+          <StatCard 
+            title="Total Reports Sent" 
+            value={stats.totals.total} 
+            icon={FileText} 
+            gradient="from-blue-500 to-blue-600"
+            delta={stats.deltas ? Math.abs(stats.deltas.total) : undefined}
+            isIncrease={stats.deltas?.total >= 0}
+          />
+          <StatCard 
+            title="Pending Reports" 
+            value={stats.totals.pending} 
+            icon={Clock} 
+            gradient="from-amber-500 to-amber-600"
+            delta={stats.deltas ? Math.abs(stats.deltas.pending) : undefined}
+            isIncrease={stats.deltas?.pending >= 0}
+          />
+        </div>
 
-def get_delta(current, prev):
-    if prev is None: return None
-    return int(current - prev)
+        {/* Visual Analytics */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
+          
+          {/* Reports Sent Progress List */}
+          <div className="lg:col-span-4 bg-white p-10 rounded-[3rem] shadow-[0_10px_40px_-15px_rgba(0,0,0,0.03)] border border-slate-50 h-[450px] flex flex-col">
+            <div className="flex items-center justify-between mb-10">
+              <h3 className="font-black text-slate-900 text-[10px] uppercase tracking-[0.25em] flex items-center gap-3">
+                <div className="w-1.5 h-6 bg-blue-600 rounded-full"></div>
+                Reports Sent Leaderboard
+              </h3>
+              <span className="bg-slate-100 text-slate-400 text-[9px] font-black px-3 py-1 rounded-full uppercase tracking-widest">{activeTab} '24</span>
+            </div>
+            <div className="space-y-8 overflow-y-auto pr-3 custom-scrollbar flex-grow">
+              {currentData.sort((a, b) => b.total - a.total).map((item) => (
+                <div key={item.id} className="group">
+                  <div className="flex justify-between items-center text-[11px] font-black mb-3">
+                    <span className="text-slate-600 uppercase group-hover:text-blue-600 transition-colors">{item.id}</span>
+                    <span className="text-slate-400 font-bold">{item.total} REPORTS</span>
+                  </div>
+                  <div className="w-full bg-slate-100 h-3 rounded-full overflow-hidden">
+                    <div 
+                      className="bg-[#3B82F6] h-full rounded-full transition-all duration-1000 ease-out"
+                      style={{ width: `${(item.total / Math.max(...DATA_SET[activeTab].map(d => d.total || 1))) * 100}%` }}
+                    ></div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
 
-# Header
-st.title("Executive Dashboard")
-st.caption(f"Performance Analytics Suite • {active_month.upper()} 2024")
+          {/* Tower vs Site Comparison Chart */}
+          <div className="lg:col-span-8 bg-white p-10 rounded-[3rem] shadow-[0_10px_40px_-15px_rgba(0,0,0,0.03)] border border-slate-50 h-[450px]">
+             <div className="flex items-center justify-between mb-10">
+              <h3 className="font-black text-slate-900 text-[10px] uppercase tracking-[0.25em] flex items-center gap-3">
+                <div className="w-1.5 h-6 bg-indigo-500 rounded-full"></div>
+                Tower vs Site Activity Analysis
+              </h3>
+              <div className="flex gap-6">
+                <div className="flex items-center gap-2 text-[9px] font-black uppercase text-slate-400 tracking-widest">
+                  <div className="w-2.5 h-2.5 rounded-full bg-indigo-500"></div> Tower
+                </div>
+                <div className="flex items-center gap-2 text-[9px] font-black uppercase text-slate-400 tracking-widest">
+                  <div className="w-2.5 h-2.5 rounded-full bg-emerald-500"></div> Site
+                </div>
+              </div>
+            </div>
+            <div className="h-[280px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart
+                  data={currentData}
+                  layout="vertical"
+                  margin={{ top: 0, right: 30, left: 10, bottom: 0 }}
+                  barGap={8}
+                >
+                  <XAxis type="number" hide />
+                  <YAxis 
+                    dataKey="id" 
+                    type="category" 
+                    axisLine={false} 
+                    tickLine={false} 
+                    tick={{ fill: '#94a3b8', fontSize: 11, fontWeight: 900 }}
+                    width={80}
+                  />
+                  <Tooltip 
+                    cursor={{ fill: '#F8FAFC', radius: 12 }}
+                    contentStyle={{ borderRadius: '20px', border: 'none', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.1)', padding: '15px' }}
+                  />
+                  <Bar dataKey="floor" fill="#6366f1" radius={[0, 20, 20, 0]} barSize={10} name="Tower Visits" />
+                  <Bar dataKey="site" fill="#10b981" radius={[0, 20, 20, 0]} barSize={10} name="Site Visits" />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        </div>
 
-# KPI Rows
-m1, m2, m3, m4 = st.columns(4)
-m1.metric("Total Tower Visits", totals["Floor Visit"], delta=get_delta(totals["Floor Visit"], prev_totals["Floor Visit"] if prev_totals is not None else None))
-m2.metric("Total Site Visits", totals["Site Visit"], delta=get_delta(totals["Site Visit"], prev_totals["Site Visit"] if prev_totals is not None else None))
-m3.metric("Total Reports Sent", totals["Total"], delta=get_delta(totals["Total"], prev_totals["Total"] if prev_totals is not None else None))
-m4.metric("Total Pending", totals["Pending"], delta=get_delta(totals["Pending"], prev_totals["Pending"] if prev_totals is not None else None), delta_color="inverse")
+        {/* Detailed Data Ledger */}
+        <div className="bg-white rounded-[3rem] shadow-[0_10px_40px_-15px_rgba(0,0,0,0.03)] border border-slate-50 overflow-hidden mb-16">
+          <div className="px-10 py-8 border-b border-slate-50 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+            <div>
+              <h3 className="font-black text-slate-900 text-[10px] uppercase tracking-[0.3em]">Detailed Performance Breakdown</h3>
+              <p className="text-slate-400 text-[11px] font-bold mt-1 uppercase tracking-tighter">Full ledger of associate outputs & conversions</p>
+            </div>
+            <div className="flex gap-4 w-full md:w-auto">
+              <div className="relative flex-grow md:min-w-[280px]">
+                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={16} />
+                <input 
+                  type="text" 
+                  placeholder="FILTER ASSOCIATE NAME..." 
+                  value={filterText}
+                  onChange={(e) => setFilterText(e.target.value)}
+                  className="pl-12 pr-6 py-3.5 bg-slate-50 border-none rounded-2xl text-[10px] font-black uppercase tracking-widest focus:ring-4 focus:ring-blue-50 outline-none w-full transition-all"
+                />
+              </div>
+              <button className="p-3.5 bg-slate-900 text-white rounded-2xl hover:bg-black transition-all active:scale-95 shadow-xl shadow-slate-200">
+                <Download size={20} strokeWidth={2.5} />
+              </button>
+            </div>
+          </div>
+          
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="bg-slate-50/50 text-slate-400 text-[10px] font-black uppercase tracking-[0.25em]">
+                  <th className="px-10 py-6">Associate ID</th>
+                  <th className="px-6 py-6 text-center">Floor Visits</th>
+                  <th className="px-6 py-6 text-center">Site Visits</th>
+                  <th className="px-6 py-6 text-center">Mark (YES)</th>
+                  <th className="px-6 py-6 text-center">Sugg (NO)</th>
+                  <th className="px-6 py-6 text-center">Pending</th>
+                  <th className="px-6 py-6 text-center">Sent</th>
+                  {activeTab !== 'jan' && <th className="px-6 py-6 text-center text-blue-600">Backlog</th>}
+                  <th className="px-10 py-6 text-right">Grand Total</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-50">
+                {currentData.map((row) => (
+                  <tr key={row.id} className="group hover:bg-slate-50/50 transition-colors">
+                    <td className="px-10 py-6 font-black text-slate-800 uppercase border-l-4 border-transparent group-hover:border-blue-600">{row.id}</td>
+                    <td className="px-6 py-6 text-center text-slate-500 font-bold">{row.floor}</td>
+                    <td className="px-6 py-6 text-center text-slate-500 font-bold">{row.site}</td>
+                    <td className="px-6 py-6 text-center">
+                      <span className="text-emerald-600 font-black px-3 py-1 bg-emerald-50 rounded-lg">{row.reportMark}</span>
+                    </td>
+                    <td className="px-6 py-6 text-center text-rose-400 font-bold">{row.suggestion}</td>
+                    <td className="px-6 py-6 text-center">
+                      <span className={`px-2.5 py-1 rounded-lg text-[10px] font-black ${row.pending > 0 ? 'bg-orange-50 text-orange-600 border border-orange-100' : 'text-slate-300'}`}>
+                        {row.pending}
+                      </span>
+                    </td>
+                    <td className="px-6 py-6 text-center text-slate-500 font-bold">{row.sent}</td>
+                    {activeTab !== 'jan' && (
+                      <td className="px-6 py-6 text-center">
+                        <span className={`font-black ${row.backlog > 0 ? 'text-blue-500' : 'text-slate-200'}`}>
+                          {row.backlog}
+                        </span>
+                      </td>
+                    )}
+                    <td className="px-10 py-6 text-right text-slate-900 font-black text-base">{row.total}</td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot className="bg-slate-900 text-white font-black">
+                <tr>
+                  <td className="px-10 py-8 uppercase tracking-[0.4em] text-[10px]">Team Aggregate</td>
+                  <td className="px-6 py-8 text-center text-slate-400 font-black">{stats.totals.floor}</td>
+                  <td className="px-6 py-8 text-center text-slate-400 font-black">{stats.totals.site}</td>
+                  <td className="px-6 py-8 text-center text-emerald-400 font-black">{stats.totals.reportMark}</td>
+                  <td className="px-6 py-8 text-center text-rose-400 font-black">{stats.totals.suggestion}</td>
+                  <td className="px-6 py-8 text-center text-amber-400 font-black">{stats.totals.pending}</td>
+                  <td className="px-6 py-8 text-center text-white">{stats.totals.sent}</td>
+                  {activeTab !== 'jan' && <td className="px-6 py-8 text-center text-blue-400">{stats.totals.backlog}</td>}
+                  <td className="px-10 py-8 text-right text-2xl text-blue-400 tracking-tighter">{stats.totals.total}</td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
 
-st.markdown("---")
-
-# Charts Row
-c1, c2 = st.columns([1, 1.5])
-
-with c1:
-    st.subheader("Reports Sent Leaderboard")
-    fig_sent = px.bar(
-        df_current.sort_values("Total", ascending=True),
-        x="Total",
-        y="Associate ID",
-        orientation='h',
-        text="Total",
-        color_discrete_sequence=['#3B82F6'],
-        template="plotly_white"
-    )
-    fig_sent.update_layout(showlegend=False, height=400, margin=dict(l=0, r=0, t=20, b=0))
-    st.plotly_chart(fig_sent, use_container_width=True)
-
-with c2:
-    st.subheader("Tower vs Site Visits Breakdown")
-    fig_visits = go.Figure()
-    fig_visits.add_trace(go.Bar(
-        y=df_current["Associate ID"],
-        x=df_current["Floor Visit"],
-        name='Tower Visits',
-        orientation='h',
-        marker_color='#6366f1'
-    ))
-    fig_visits.add_trace(go.Bar(
-        y=df_current["Associate ID"],
-        x=df_current["Site Visit"],
-        name='Site Visits',
-        orientation='h',
-        marker_color='#10b981'
-    ))
-    fig_visits.update_layout(
-        barmode='group',
-        template="plotly_white",
-        height=400,
-        margin=dict(l=0, r=0, t=20, b=0),
-        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
-    )
-    st.plotly_chart(fig_visits, use_container_width=True)
-
-# Table Section
-st.subheader("Detailed Performance Breakdown")
-search = st.text_input("Filter Associate by Name", "")
-if search:
-    df_display = df_current[df_current["Associate ID"].str.contains(search, case=False)]
-else:
-    df_display = df_current
-
-# Style the dataframe
-st.dataframe(df_display, use_container_width=True, hide_index=True)
-
-# Totals Footer Row (Manual styling for emphasis)
-t1, t2, t3, t4, t5, t6, t7, t8, t9 = st.columns([1.5, 1, 1, 1, 1, 1, 1, 1, 1])
-with t1: st.write("**TEAM TOTALS**")
-with t2: st.write(f"**{totals['Floor Visit']}**")
-with t3: st.write(f"**{totals['Site Visit']}**")
-with t4: st.write(f"**{totals['Report Mark (YES)']}**")
-with t5: st.write(f"**{totals['Suggestion (NO)']}**")
-with t6: st.write(f"**{totals['Pending']}**")
-with t7: st.write(f"**{totals['Sent']}**")
-with t8: st.write(f"**{totals['Backlog']}**")
-with t9: st.write(f"**{totals['Total']}**")
-
-st.markdown('<div class="footer">GENERATED FOR EXECUTIVE REVIEW • PROPRIETARY FIELD ANALYTICS</div>', unsafe_allow_html=True)
+export default App;
